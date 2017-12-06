@@ -1,4 +1,4 @@
-package main
+package upload
 
 import (
 	"bytes"
@@ -16,9 +16,6 @@ import (
 )
 
 const APIRoot = "https://poly.rpi.edu/wp-json"
-
-var APIPassword = os.Args[1]
-var SnippetPath = os.Args[2]
 
 type WPPostReturned struct {
 	Title struct {
@@ -196,11 +193,12 @@ func (s Story) Print() {
 	fmt.Printf("%13s: %.80s...\n", "Body text", s.BodyText())
 }
 
-func main() {
+func ParseAndUpload(apiPassword, snippetPath string) {
 	c := color.New(color.FgCyan)
-	c.Printf("Reading \"%s\"...", SnippetPath)
-	file, err := os.Open(SnippetPath)
+	c.Printf("Reading \"%s\"...", snippetPath)
+	file, err := os.Open(snippetPath)
 	if err != nil {
+		fmt.Println()
 		r := color.New(color.FgRed)
 		r.Println(err)
 		return
@@ -253,7 +251,7 @@ func main() {
 
 	// check if we already uploaded this
 	req, err := http.NewRequest("GET", APIRoot+"/wp/v2/posts?per_page=30&status=any", nil)
-	req.SetBasicAuth("uploader", APIPassword)
+	req.SetBasicAuth("uploader", apiPassword)
 	if err != nil {
 		r := color.New(color.FgRed)
 		r.Println(err)
@@ -305,7 +303,7 @@ func main() {
 		return
 	}
 	req.Header["Content-Type"] = []string{"application/json"}
-	req.SetBasicAuth("uploader", APIPassword)
+	req.SetBasicAuth("uploader", apiPassword)
 	resp, err = client.Do(req)
 	if err != nil {
 		r := color.New(color.FgRed)

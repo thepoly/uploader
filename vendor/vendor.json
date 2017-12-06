@@ -9,6 +9,12 @@
 			"revisionTime": "2017-09-26T11:14:11Z"
 		},
 		{
+			"checksumSHA1": "40vJyUB4ezQSn/NSadsKEOrudMc=",
+			"path": "github.com/inconshreveable/mousetrap",
+			"revision": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75",
+			"revisionTime": "2014-10-17T20:07:13Z"
+		},
+		{
 			"checksumSHA1": "6WOrEA4SH+M4UPESadwZ7J4ytnE=",
 			"path": "github.com/mattn/go-colorable",
 			"revision": "6fcc0c1fd9b620311d821b106a400b35dc95c497",
@@ -19,6 +25,18 @@
 			"path": "github.com/mattn/go-isatty",
 			"revision": "6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c",
 			"revisionTime": "2017-11-07T05:05:31Z"
+		},
+		{
+			"checksumSHA1": "UWs4OTID/u0UyNWYDjgKjQXJkDA=",
+			"path": "github.com/spf13/cobra",
+			"revision": "c156af39849842c87f2ce59882c5f4bd98977c43",
+			"revisionTime": "2017-12-06T18:18:45Z"
+		},
+		{
+			"checksumSHA1": "fKq6NiaqP3DFxnCRF5mmpJWTSUA=",
+			"path": "github.com/spf13/pflag",
+			"revision": "4c012f6dcd9546820e378d0bdda4d8fc772cdfea",
+			"revisionTime": "2017-11-06T14:28:49Z"
 		},
 		{
 			"checksumSHA1": "DsCMhn2brLPL1B56SJkykedW7jE=",
