@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 const APIRoot = "https://poly.rpi.edu/wp-json"
@@ -21,6 +24,7 @@ type WPPostReturned struct {
 	Title struct {
 		Rendered string `json:"rendered"`
 	} `json:"title"`
+	Link string
 }
 
 type WPPost struct {
@@ -64,7 +68,7 @@ func (s Story) CreateWPPost() WPPost {
 	wpPost.Date = date
 
 	wpPost.Meta.AuthorName = s.AuthorName()
-	wpPost.Meta.AuthorTitle = s.AuthorJob()
+	wpPost.Meta.AuthorTitle = s.AuthorTitle()
 	wpPost.Meta.Kicker = s.Kicker()
 	wpPost.Content = s.BodyText()
 	return wpPost
@@ -82,7 +86,7 @@ func (s Story) AuthorName() string {
 	return ""
 }
 
-func (s Story) AuthorJob() string {
+func (s Story) AuthorTitle() string {
 	for _, story := range s.IDMLStories {
 		for _, paragraph := range story.IDMLParagraphStyleRanges {
 			style := paragraph.AppliedParagraphStyle
@@ -148,17 +152,62 @@ func (s Story) Headline() string {
 	return ""
 }
 
+func (s Story) Validate() []string {
+	validationErrors := []string{}
+
+	headline := s.Headline()
+	if headline == "" {
+		validationErrors = append(validationErrors, "No headline.")
+	}
+
+	authorName := s.AuthorName()
+	if authorName == "" {
+		validationErrors = append(validationErrors, "No author name.")
+	}
+
+	kicker := s.Kicker()
+	if kicker == "" {
+		validationErrors = append(validationErrors, "No kicker.")
+	}
+
+	authorTitle := s.AuthorTitle()
+	if authorTitle == "" {
+		validationErrors = append(validationErrors, "No author title.")
+	}
+
+	bodyText := s.BodyText()
+	if bodyText == "" {
+		validationErrors = append(validationErrors, "No body text.")
+	} else if len(bodyText) < 100 {
+		msg := fmt.Sprintf("Body text extremely short (%d characters).", len(bodyText))
+		validationErrors = append(validationErrors, msg)
+	}
+
+	return validationErrors
+}
+
+func (s Story) Print() {
+	fmt.Printf("%15s\n", "Story")
+	fmt.Printf("-------------------------\n")
+	fmt.Printf("%13s: %s\n", "Kicker", s.Kicker())
+	fmt.Printf("%13s: %s\n", "Headline", s.Headline())
+	fmt.Printf("%13s: %s\n", "Author name", s.AuthorName())
+	fmt.Printf("%13s: %s\n", "Author title", s.AuthorTitle())
+	fmt.Printf("%13s: %.80s...\n", "Body text", s.BodyText())
+}
+
 func main() {
-	log.Println("parsing")
+	c := color.New(color.FgCyan)
+	c.Printf("Reading \"%s\"...", SnippetPath)
 	file, err := os.Open(SnippetPath)
 	if err != nil {
-		log.Println(err)
+		r := color.New(color.FgRed)
+		r.Println(err)
 		return
 	}
 
 	story := Story{IDMLStories: []IDMLStory{}}
 	decoder := xml.NewDecoder(file)
-	indent := 0
 	for {
 		t, _ := decoder.Token()
 		if t == nil {
@@ -166,73 +215,92 @@ func main() {
 		}
 		switch se := t.(type) {
 		case xml.StartElement:
-			indent++
-			indentStr := ""
-			for i := 0; i < indent; i++ {
-				indentStr += " "
-			}
 			if se.Name.Local == "Story" {
-				// log.Println(indentStr + se.Name.Local)
 				idmlStory := IDMLStory{}
 				decoder.DecodeElement(&idmlStory, &se)
 				story.IDMLStories = append(story.IDMLStories, idmlStory)
 			}
-		case xml.EndElement:
-			indent--
 		}
 	}
-	// log.Println(story.Kicker())
-	log.Println(story.Headline() + " by " + story.AuthorName())
-	// log.Println(story.AuthorName())
-	// log.Println(story.AuthorJob())
-	// log.Println(story.BodyText())
-	// log.Println(story.CreateWPPost())
+	c.Printf(" done.\n")
+
+	validationErrors := story.Validate()
+	if len(validationErrors) > 0 {
+		color.Red("Validation errors.")
+	} else {
+		color.Green("Validation succeeded.")
+	}
+	for _, validationError := range validationErrors {
+		color.Yellow("\t" + validationError)
+	}
+	if len(validationErrors) > 0 {
+		color.Red("Aborting.")
+		return
+	}
+
+	fmt.Println()
+	story.Print()
+	fmt.Println()
 
 	client := http.Client{Timeout: 10 * time.Second}
 	body, err := json.Marshal(story.CreateWPPost())
 	if err != nil {
+		r := color.New(color.FgRed)
+		r.Println(err)
 		log.Println(err)
 		return
 	}
 
 	// check if we already uploaded this
-	req, err := http.NewRequest("GET", APIRoot+"/wp/v2/posts?per_page=30&status=future", nil)
+	req, err := http.NewRequest("GET", APIRoot+"/wp/v2/posts?per_page=30&status=any", nil)
 	req.SetBasicAuth("uploader", APIPassword)
 	if err != nil {
+		r := color.New(color.FgRed)
+		r.Println(err)
 		log.Println(err)
 		return
 	}
 	resp, err := client.Do(req)
 	if err != nil {
+		r := color.New(color.FgRed)
+		r.Println(err)
 		log.Println(err)
 		return
 	}
 	if resp.StatusCode == 400 {
-		log.Println("unauthorized")
+		data, _ := ioutil.ReadAll(resp.Body)
+		color.Red("WordPress communication failed: %s", string(data))
 		return
 	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		r := color.New(color.FgRed)
+		r.Println(err)
 		return
 	}
 	posts := []WPPostReturned{}
 	err = json.Unmarshal(data, &posts)
 	if err != nil {
-		log.Println(err)
+		r := color.New(color.FgRed)
+		r.Println(err)
 		return
 	}
 	for _, post := range posts {
 		if post.Title.Rendered == story.Headline() {
-			log.Println("future post with same title already exists; aborting")
+			color.Yellow("Similar post already exists: %s", post.Link)
+			color.Red("Aborting.")
 			return
 		}
 	}
 
+	return
+
 	// create post
-	log.Println("uploading")
+	c.Println("Uploading...")
 	req, err = http.NewRequest("POST", APIRoot+"/wp/v2/posts", bytes.NewBuffer(body))
 	if err != nil {
+		r := color.New(color.FgRed)
+		r.Println(err)
 		log.Println(err)
 		return
 	}
@@ -240,13 +308,16 @@ func main() {
 	req.SetBasicAuth("uploader", APIPassword)
 	resp, err = client.Do(req)
 	if err != nil {
-		log.Println(err)
+		r := color.New(color.FgRed)
+		r.Println(err)
 		return
 	}
 	_, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		r := color.New(color.FgRed)
+		r.Println(err)
 		return
 	}
-	log.Println("done")
+	g := color.New(color.FgGreen)
+	g.Println("Done.")
 }
