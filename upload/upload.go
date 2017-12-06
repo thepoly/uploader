@@ -291,31 +291,31 @@ func ParseAndUpload(apiPassword, snippetPath string) {
 		}
 	}
 
-	return
-
 	// create post
-	c.Println("Uploading...")
+	c.Print("Uploading... ")
 	req, err = http.NewRequest("POST", APIRoot+"/wp/v2/posts", bytes.NewBuffer(body))
 	if err != nil {
+		fmt.Println()
 		r := color.New(color.FgRed)
 		r.Println(err)
-		log.Println(err)
 		return
 	}
 	req.Header["Content-Type"] = []string{"application/json"}
 	req.SetBasicAuth("uploader", apiPassword)
 	resp, err = client.Do(req)
 	if err != nil {
+		fmt.Println()
 		r := color.New(color.FgRed)
 		r.Println(err)
 		return
 	}
 	_, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
+		fmt.Println()
 		r := color.New(color.FgRed)
 		r.Println(err)
 		return
 	}
 	g := color.New(color.FgGreen)
-	g.Println("Done.")
+	g.Println(" done.")
 }
