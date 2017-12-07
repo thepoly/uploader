@@ -57,6 +57,11 @@ type IDMLCharacterStyleRange struct {
 
 type Story struct {
 	IDMLStories []IDMLStory
+	IDMLLinks   []IDMLLink
+}
+
+type IDMLLink struct {
+	ResourceURI string `xml:"LinkResourceURI,attr"`
 }
 
 func (s Story) CreateWPPost() WPPost {
@@ -153,6 +158,50 @@ func (s Story) Headline() string {
 	return ""
 }
 
+func (s Story) PhotoByline() string {
+	for _, story := range s.IDMLStories {
+		for _, paragraph := range story.IDMLParagraphStyleRanges {
+			style := paragraph.AppliedParagraphStyle
+			if style == "ParagraphStyle/Photo Byline" {
+				photoByline := ""
+				for _, characterRange := range paragraph.IDMLCharacterStyleRanges {
+					for _, content := range characterRange.Content {
+						photoByline += content
+					}
+				}
+				return photoByline
+			}
+		}
+	}
+	return ""
+}
+
+func (s Story) PhotoCaption() string {
+	for _, story := range s.IDMLStories {
+		for _, paragraph := range story.IDMLParagraphStyleRanges {
+			style := paragraph.AppliedParagraphStyle
+			if style == "ParagraphStyle/Caption" {
+				caption := ""
+				for _, characterRange := range paragraph.IDMLCharacterStyleRanges {
+					for _, content := range characterRange.Content {
+						caption += content
+					}
+				}
+				return caption
+			}
+		}
+	}
+	return ""
+}
+
+func (s Story) Photo() string {
+	// this only grabs the first one...
+	for _, link := range s.IDMLLinks {
+		return link.ResourceURI
+	}
+	return ""
+}
+
 func (s Story) Validate() []string {
 	validationErrors := []string{}
 
@@ -184,6 +233,16 @@ func (s Story) Validate() []string {
 		validationErrors = append(validationErrors, msg)
 	}
 
+	photo := s.Photo()
+	photoByline := s.PhotoByline()
+	photoCaption := s.PhotoCaption()
+	if photoByline != "" && photo == "" {
+		validationErrors = append(validationErrors, "Photo byline without photo.")
+	}
+	if photoCaption != "" && photo == "" {
+		validationErrors = append(validationErrors, "Photo caption without photo.")
+	}
+
 	return validationErrors
 }
 
@@ -194,6 +253,9 @@ func (s Story) Print() {
 	fmt.Printf("%13s: %s\n", "Headline", s.Headline())
 	fmt.Printf("%13s: %s\n", "Author name", s.AuthorName())
 	fmt.Printf("%13s: %s\n", "Author title", s.AuthorTitle())
+	fmt.Printf("%13s: %s\n", "Photo", s.Photo())
+	fmt.Printf("%13s: %s\n", "Photo byline", s.PhotoByline())
+	fmt.Printf("%13s: %.80s...\n", "Photo caption", s.PhotoCaption())
 	fmt.Printf("%13s: %.80s...\n", "Body text", s.BodyText())
 }
 
@@ -217,10 +279,15 @@ func ParseAndUpload(apiPassword, snippetPath string) {
 		}
 		switch se := t.(type) {
 		case xml.StartElement:
-			if se.Name.Local == "Story" {
+			switch se.Name.Local {
+			case "Story":
 				idmlStory := IDMLStory{}
 				decoder.DecodeElement(&idmlStory, &se)
 				story.IDMLStories = append(story.IDMLStories, idmlStory)
+			case "Link":
+				idmlLink := IDMLLink{}
+				decoder.DecodeElement(&idmlLink, &se)
+				story.IDMLLinks = append(story.IDMLLinks, idmlLink)
 			}
 		}
 	}
@@ -230,10 +297,10 @@ func ParseAndUpload(apiPassword, snippetPath string) {
 	if len(validationErrors) > 0 {
 		color.Red("Validation errors.")
 	} else {
-		color.Green("Validation succeeded.")
+		color.Green("✓ Validation succeeded.")
 	}
 	for _, validationError := range validationErrors {
-		color.Yellow("\t" + validationError)
+		color.Yellow("\t● " + validationError)
 	}
 	if len(validationErrors) > 0 {
 		color.Red("Aborting.")
@@ -322,5 +389,5 @@ func ParseAndUpload(apiPassword, snippetPath string) {
 		return
 	}
 	g := color.New(color.FgGreen)
-	g.Println(" done.")
+	g.Println(" done. ✓")
 }
