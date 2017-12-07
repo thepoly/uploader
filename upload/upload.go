@@ -2,17 +2,24 @@ package upload
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/drive/v3"
 )
 
 const APIRoot = "https://poly.rpi.edu/wp-json"
@@ -194,12 +201,178 @@ func (s Story) PhotoCaption() string {
 	return ""
 }
 
-func (s Story) Photo() string {
-	// this only grabs the first one...
-	for _, link := range s.IDMLLinks {
-		return link.ResourceURI
+// getClient uses a Context and Config to retrieve a Token
+// then generate a Client. It returns the generated Client.
+func getClient(ctx context.Context, config *oauth2.Config) *http.Client {
+	cacheFile, err := tokenCacheFile()
+	if err != nil {
+		log.Fatalf("Unable to get path to cached credential file. %v", err)
 	}
-	return ""
+	tok, err := tokenFromFile(cacheFile)
+	if err != nil {
+		tok = getTokenFromWeb(config)
+		saveToken(cacheFile, tok)
+	}
+	return config.Client(ctx, tok)
+}
+
+// getTokenFromWeb uses Config to request a Token.
+// It returns the retrieved Token.
+func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("Go to the following link in your browser then type the "+
+		"authorization code: \n%v\n", authURL)
+
+	var code string
+	if _, err := fmt.Scan(&code); err != nil {
+		log.Fatalf("Unable to read authorization code %v", err)
+	}
+
+	tok, err := config.Exchange(oauth2.NoContext, code)
+	if err != nil {
+		log.Fatalf("Unable to retrieve token from web %v", err)
+	}
+	return tok
+}
+
+// tokenCacheFile generates credential file path/filename.
+// It returns the generated credential path/filename.
+func tokenCacheFile() (string, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	tokenCacheDir := filepath.Join(usr.HomeDir, ".credentials")
+	os.MkdirAll(tokenCacheDir, 0700)
+	return filepath.Join(tokenCacheDir,
+		url.QueryEscape("drive-go-quickstart.json")), err
+}
+
+// tokenFromFile retrieves a Token from a given file path.
+// It returns the retrieved Token and any read error encountered.
+func tokenFromFile(file string) (*oauth2.Token, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	t := &oauth2.Token{}
+	err = json.NewDecoder(f).Decode(t)
+	defer f.Close()
+	return t, err
+}
+
+// saveToken uses a file path to create a file and store the
+// token in it.
+func saveToken(file string, token *oauth2.Token) {
+	fmt.Printf("Saving credential file to: %s\n", file)
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		log.Fatalf("Unable to cache oauth token: %v", err)
+	}
+	defer f.Close()
+	json.NewEncoder(f).Encode(token)
+}
+
+func (s Story) Photo() []byte {
+	if len(s.IDMLLinks) == 0 {
+		return []byte("")
+	}
+	// this only grabs the first one...
+	uri := s.IDMLLinks[0].ResourceURI
+
+	ctx := context.Background()
+
+	b, err := ioutil.ReadFile("client_secret.json")
+	if err != nil {
+		log.Fatalf("Unable to read client secret file: %v", err)
+	}
+
+	// If modifying these scopes, delete your previously saved credentials
+	// at ~/.credentials/drive-go-quickstart.json
+	config, err := google.ConfigFromJSON(b, drive.DriveReadonlyScope)
+	if err != nil {
+		log.Fatalf("Unable to parse client secret file to config: %v", err)
+	}
+	client := getClient(ctx, config)
+
+	srv, err := drive.New(client)
+	if err != nil {
+		log.Fatalf("Unable to retrieve drive Client %v", err)
+	}
+	unescaped, err := url.PathUnescape(uri)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	toFind := "/Team Drives/The Polytechnic/"
+	idx := strings.Index(unescaped, toFind)
+	path := unescaped[idx+len(toFind):]
+	parent := "0ACukZyn2MrvEUk9PVA"
+	nextLevel := path[:strings.Index(path, "/")]
+	filename := ""
+
+	done := false
+	for !done {
+		var q string
+		if nextLevel != "" {
+			q = fmt.Sprintf("mimeType = 'application/vnd.google-apps.folder' and '%s' in parents", parent)
+			// log.Println("Looking for", nextLevel)
+		} else {
+			idx := strings.Index(path, "/")
+			filename = path[idx+1:]
+			q = fmt.Sprintf("name = '%s' and '%s' in parents", filename, parent)
+			// log.Println("Looking for", filename)
+		}
+
+		r, err := srv.Files.List().PageSize(10).Q(q).
+			Fields("nextPageToken, files(id, name)").
+			SupportsTeamDrives(true).IncludeTeamDriveItems(true).
+			TeamDriveId("0ACukZyn2MrvEUk9PVA").Corpora("teamDrive").Do()
+		if err != nil {
+			log.Fatalf("Unable to retrieve files: %v", err)
+		}
+		if len(r.Files) > 0 {
+			found := false
+			for _, i := range r.Files {
+				// fmt.Printf("%s (%s)\n", i.Name, i.Id)
+				if i.Name == nextLevel {
+					found = true
+					idx := strings.Index(path, "/")
+					path = path[idx+1:]
+					idx = strings.Index(path, "/")
+					if idx == -1 {
+						nextLevel = ""
+						parent = i.Id
+						break
+					}
+					nextLevel = path[:idx]
+					parent = i.Id
+					break
+				} else if i.Name == filename {
+					// Download the file
+					resp, err := srv.Files.Get(i.Id).Download()
+					if err != nil {
+						log.Fatal(err)
+					}
+					data, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						log.Fatal(err)
+					}
+					return data
+					// found = true
+					// done = true
+					// break
+				}
+			}
+			if !found {
+				done = true
+			}
+		} else {
+			fmt.Println("No files found.")
+		}
+	}
+
+	return []byte("")
 }
 
 // Validate checks some things that should be consistent in all articles, e.g.
@@ -253,10 +426,10 @@ func (s Story) Validate() []string {
 	photo := s.Photo()
 	photoByline := s.PhotoByline()
 	photoCaption := s.PhotoCaption()
-	if photoByline != "" && photo == "" {
+	if photoByline != "" && len(photo) == 0 {
 		validationErrors = append(validationErrors, "Photo byline without photo.")
 	}
-	if photoCaption != "" && photo == "" {
+	if photoCaption != "" && len(photo) == 0 {
 		validationErrors = append(validationErrors, "Photo caption without photo.")
 	}
 
@@ -277,7 +450,12 @@ func (s Story) Print() {
 	fmt.Printf("%13s: %s\n", "Headline", s.Headline())
 	fmt.Printf("%13s: %s\n", "Author name", s.AuthorName())
 	fmt.Printf("%13s: %s\n", "Author title", s.AuthorTitle())
-	fmt.Printf("%13s: %s\n", "Photo", s.Photo())
+	photo := s.Photo()
+	if len(photo) > 0 {
+		fmt.Printf("%13s: %.2f MB\n", "Photo", float64(len(s.Photo()))/1024/1024)
+	} else {
+		fmt.Printf("%13s:\n", "Photo")
+	}
 	fmt.Printf("%13s: %s\n", "Photo byline", s.PhotoByline())
 	fmt.Printf("%13s: %.80s...\n", "Photo caption", s.PhotoCaption())
 	fmt.Printf("%13s: %.80s...\n", "Body text", s.BodyText())
