@@ -202,6 +202,11 @@ func (s Story) Photo() string {
 	return ""
 }
 
+// Validate checks some things that should be consistent in all articles, e.g.
+// has a headline and author, no double spaces, there's a photo if there's a caption, etc.
+// Errors found here are usually the result of making an improper snippet in InDesign.
+// Any failure here will prevent the article from being posted to the website.
+// We may want to add a command line flag in the future to ignore validation errors.
 func (s Story) Validate() []string {
 	validationErrors := []string{}
 
@@ -209,20 +214,32 @@ func (s Story) Validate() []string {
 	if headline == "" {
 		validationErrors = append(validationErrors, "No headline.")
 	}
+	if strings.Contains(headline, "  ") {
+		validationErrors = append(validationErrors, "Headline contains two consecutive spaces.")
+	}
 
 	authorName := s.AuthorName()
 	if authorName == "" {
 		validationErrors = append(validationErrors, "No author name.")
+	}
+	if strings.Contains(authorName, "  ") {
+		validationErrors = append(validationErrors, "Author name contains two consecutive spaces.")
 	}
 
 	kicker := s.Kicker()
 	if kicker == "" {
 		validationErrors = append(validationErrors, "No kicker.")
 	}
+	if strings.Contains(kicker, "  ") {
+		validationErrors = append(validationErrors, "Kicker contains two consecutive spaces.")
+	}
 
 	authorTitle := s.AuthorTitle()
 	if authorTitle == "" {
 		validationErrors = append(validationErrors, "No author title.")
+	}
+	if strings.Contains(authorTitle, "  ") {
+		validationErrors = append(validationErrors, "Author title contains two consecutive spaces.")
 	}
 
 	bodyText := s.BodyText()
@@ -241,6 +258,13 @@ func (s Story) Validate() []string {
 	}
 	if photoCaption != "" && photo == "" {
 		validationErrors = append(validationErrors, "Photo caption without photo.")
+	}
+
+	if strings.Contains(photoByline, "  ") {
+		validationErrors = append(validationErrors, "Photo byline contains two consecutive spaces.")
+	}
+	if strings.Contains(photoCaption, "  ") {
+		validationErrors = append(validationErrors, "Photo caption contains two consecutive spaces.")
 	}
 
 	return validationErrors
