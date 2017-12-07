@@ -21,6 +21,10 @@ type WPPostReturned struct {
 	Title struct {
 		Rendered string `json:"rendered"`
 	} `json:"title"`
+	Meta struct {
+		AuthorName string
+		Kicker     string
+	} `json:"meta"`
 	Link string
 }
 
@@ -282,7 +286,10 @@ func ParseAndUpload(apiPassword, snippetPath string) {
 		return
 	}
 	for _, post := range posts {
-		if post.Title.Rendered == story.Headline() {
+		// See if we have a recent post with the same headline
+		// OR the same kicker and author.
+		if post.Title.Rendered == story.Headline() ||
+			(post.Meta.Kicker == story.Kicker() && post.Meta.AuthorName == story.AuthorName()) {
 			color.Yellow("Similar post already exists: %s", post.Link)
 			color.Red("Aborting.")
 			return
