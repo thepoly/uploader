@@ -255,14 +255,12 @@ func ParseAndUpload(apiPassword, snippetPath string) {
 	if err != nil {
 		r := color.New(color.FgRed)
 		r.Println(err)
-		log.Println(err)
 		return
 	}
 	resp, err := client.Do(req)
 	if err != nil {
 		r := color.New(color.FgRed)
 		r.Println(err)
-		log.Println(err)
 		return
 	}
 	if resp.StatusCode == 400 {
