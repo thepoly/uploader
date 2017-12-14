@@ -14,6 +14,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -65,13 +66,29 @@ type IDMLCharacterStyleRange struct {
 type Story struct {
 	IDMLStories []IDMLStory
 	IDMLLinks   []IDMLLink
+	// cache for caching results of expensive method calls
+	m     sync.Mutex
+	cache map[string]interface{}
 }
 
 type IDMLLink struct {
 	ResourceURI string `xml:"LinkResourceURI,attr"`
 }
 
-func (s Story) CreateWPPost() WPPost {
+func (s *Story) cacheGet(key string) (interface{}, bool) {
+	s.m.Lock()
+	val, ok := s.cache[key]
+	s.m.Unlock()
+	return val, ok
+}
+
+func (s *Story) cacheSet(key string, val interface{}) {
+	s.m.Lock()
+	s.cache[key] = val
+	s.m.Unlock()
+}
+
+func (s *Story) CreateWPPost() WPPost {
 	wpPost := WPPost{}
 	wpPost.Title = s.Headline()
 	wpPost.Status = "future"
@@ -87,24 +104,34 @@ func (s Story) CreateWPPost() WPPost {
 	return wpPost
 }
 
-func (s Story) AuthorName() string {
+func (s *Story) AuthorName() string {
+	if val, ok := s.cacheGet("AuthorName"); ok {
+		return val.(string)
+	}
 	for _, story := range s.IDMLStories {
 		for _, paragraph := range story.IDMLParagraphStyleRanges {
 			style := paragraph.AppliedParagraphStyle
 			if style == "ParagraphStyle/Author" {
-				return paragraph.IDMLCharacterStyleRanges[0].Content[0]
+				res := paragraph.IDMLCharacterStyleRanges[0].Content[0]
+				s.cacheSet("AuthorName", res)
+				return res
 			}
 		}
 	}
 	return ""
 }
 
-func (s Story) AuthorTitle() string {
+func (s *Story) AuthorTitle() string {
+	if val, ok := s.cacheGet("AuthorTitle"); ok {
+		return val.(string)
+	}
 	for _, story := range s.IDMLStories {
 		for _, paragraph := range story.IDMLParagraphStyleRanges {
 			style := paragraph.AppliedParagraphStyle
 			if style == "ParagraphStyle/Author Job" {
-				return paragraph.IDMLCharacterStyleRanges[0].Content[0]
+				res := paragraph.IDMLCharacterStyleRanges[0].Content[0]
+				s.cacheSet("AuthorTitle", res)
+				return res
 			}
 		}
 	}
@@ -112,11 +139,16 @@ func (s Story) AuthorTitle() string {
 }
 
 func (s Story) Kicker() string {
+	if val, ok := s.cacheGet("Kicker"); ok {
+		return val.(string)
+	}
 	for _, story := range s.IDMLStories {
 		for _, paragraph := range story.IDMLParagraphStyleRanges {
 			style := paragraph.AppliedParagraphStyle
 			if style == "ParagraphStyle/Kicker" {
-				return paragraph.IDMLCharacterStyleRanges[0].Content[0]
+				res := paragraph.IDMLCharacterStyleRanges[0].Content[0]
+				s.cacheSet("Kicker", res)
+				return res
 			}
 		}
 	}
@@ -124,6 +156,9 @@ func (s Story) Kicker() string {
 }
 
 func (s Story) BodyText() string {
+	if val, ok := s.cache["BodyText"]; ok {
+		return val.(string)
+	}
 	for _, story := range s.IDMLStories {
 		for _, paragraph := range story.IDMLParagraphStyleRanges {
 			style := paragraph.AppliedParagraphStyle
@@ -140,6 +175,7 @@ func (s Story) BodyText() string {
 						}
 					}
 				}
+				s.cache["BodyText"] = bodyText
 				return bodyText
 			}
 		}
@@ -274,6 +310,10 @@ func saveToken(file string, token *oauth2.Token) {
 }
 
 func (s Story) Photo() []byte {
+	if val, ok := s.cache["Photo"]; ok {
+		return val.([]byte)
+	}
+
 	if len(s.IDMLLinks) == 0 {
 		return []byte("")
 	}
@@ -358,6 +398,7 @@ func (s Story) Photo() []byte {
 					if err != nil {
 						log.Fatal(err)
 					}
+					s.cache["Photo"] = data
 					return data
 					// found = true
 					// done = true
@@ -461,6 +502,14 @@ func (s Story) Print() {
 	fmt.Printf("%13s: %.80s...\n", "Body text", s.BodyText())
 }
 
+func NewStory() Story {
+	return Story{
+		IDMLStories: []IDMLStory{},
+		IDMLLinks:   []IDMLLink{},
+		cache:       make(map[string]interface{}),
+	}
+}
+
 func ParseAndUpload(apiPassword, snippetPath string) {
 	c := color.New(color.FgCyan)
 	c.Printf("Reading \"%s\"...", snippetPath)
@@ -472,7 +521,7 @@ func ParseAndUpload(apiPassword, snippetPath string) {
 		return
 	}
 
-	story := Story{IDMLStories: []IDMLStory{}}
+	story := NewStory()
 	decoder := xml.NewDecoder(file)
 	for {
 		t, _ := decoder.Token()
