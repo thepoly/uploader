@@ -146,13 +146,13 @@ func saveToken(file string, token *oauth2.Token) {
 func (m *Manager) updater() {
 	m.update()
 	for range time.Tick(time.Second * 10) {
-		// m.update()
+		m.update()
 	}
 }
 
 func (m *Manager) update() {
 	var q string
-	when := time.Now().Add(time.Hour * 24 * -5).Format(time.RFC3339)
+	when := time.Now().Add(time.Hour * 24 * -1).Format(time.RFC3339)
 	q = fmt.Sprintf("name contains '.idms' and mimeType = 'text/xml' and modifiedTime >= '%s'", when)
 
 	snippets := []*Snippet{}
@@ -161,7 +161,7 @@ func (m *Manager) update() {
 		SupportsTeamDrives(true).IncludeTeamDriveItems(true).
 		TeamDriveId("0ACukZyn2MrvEUk9PVA").Corpora("teamDrive").Do()
 	if err != nil {
-		log.Fatalf("Unable to retrieve files: %v", err)
+		log.Printf("Unable to retrieve files: %v", err)
 		return
 	}
 
@@ -233,6 +233,9 @@ func (s *Story) ValidationErrors() []string {
 	}
 	if strings.Contains(s.Kicker, "  ") {
 		validationErrors = append(validationErrors, "Kicker contains two consecutive spaces.")
+	}
+	if strings.ToUpper(s.Kicker) == "EDITORIAL NOTEBOOKS" {
+		validationErrors = append(validationErrors, "Kicker contains plural \"notebooks.\"")
 	}
 
 	if s.AuthorTitle == "" {

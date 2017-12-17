@@ -3,7 +3,6 @@ package story
 import (
 	"encoding/xml"
 	"io"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -133,7 +132,6 @@ func (s *Snippet) AuthorTitle() string {
 					}
 				}
 				s.cache["AuthorTitle"] = authorTitle
-				log.Println(authorTitle)
 				return authorTitle
 			}
 		}
