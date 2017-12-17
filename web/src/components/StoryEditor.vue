@@ -71,6 +71,7 @@ export default {
       this.story.authorName = this.story.authorName.replace(/(&nbsp;)/gim, ' ')
       this.story.authorTitle = this.story.authorTitle.replace(/(<br>)/gim, '')
       this.story.authorTitle = this.story.authorTitle.replace(/(&nbsp;)/gim, ' ')
+      this.story.bodyText = this.story.bodyText.replace(/(&nbsp;)/gim, ' ')
 
       // remove snippet object from story object, then POST
       let copy = Object.assign({}, this.story)

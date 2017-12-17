@@ -119,9 +119,22 @@ func (s *Snippet) AuthorTitle() string {
 		for _, paragraph := range story.IDMLParagraphStyleRanges {
 			style := paragraph.AppliedParagraphStyle
 			if style == "ParagraphStyle/Author Job" {
-				res := paragraph.IDMLCharacterStyleRanges[0].Content[0]
-				s.cacheSet("AuthorTitle", res)
-				return res
+				authorTitle := ""
+				for _, characterRange := range paragraph.IDMLCharacterStyleRanges {
+					// look for regular because author title line is italicized by default
+					if characterRange.FontStyle == "Regular" {
+						authorTitle += "<i>"
+					}
+					for _, content := range characterRange.Content {
+						authorTitle += content
+					}
+					if characterRange.FontStyle == "Regular" {
+						authorTitle += "</i>"
+					}
+				}
+				s.cache["AuthorTitle"] = authorTitle
+				log.Println(authorTitle)
+				return authorTitle
 			}
 		}
 	}
@@ -172,9 +185,6 @@ func (s *Snippet) BodyText() string {
 					}
 				}
 				bodyText += "</p>"
-				if strings.Contains(bodyText, "Etzine") {
-					log.Println(bodyText)
-				}
 				s.cache["BodyText"] = bodyText
 				return bodyText
 			}
