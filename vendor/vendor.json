@@ -27,6 +27,18 @@
 			"revisionTime": "2017-09-26T11:14:11Z"
 		},
 		{
+			"checksumSHA1": "2T3sb2ZthMry+Tyng2oWGRjSFv0=",
+			"path": "github.com/go-chi/chi",
+			"revision": "f2aed534ddaae0ec331ea305ef9a804b67b672f6",
+			"revisionTime": "2017-12-13T20:22:12Z"
+		},
+		{
+			"checksumSHA1": "r/8uaoEFx3XAL2U2MJ3xmgJ78qo=",
+			"path": "github.com/go-chi/cors",
+			"revision": "dba6525398619dead495962a916728e7ee2ca322",
+			"revisionTime": "2017-08-02T15:05:10Z"
+		},
+		{
 			"checksumSHA1": "yqF125xVSkmfLpIVGrLlfE05IUk=",
 			"path": "github.com/golang/protobuf/proto",
 			"revision": "1e59b77b52bf8e4b449a57e6f79f21226d571845",

@@ -19,4 +19,6 @@ export default {
 
 <style>
 @import '../node_modules/bulma/css/bulma.css';
+@import '../node_modules/medium-editor/dist/css/medium-editor.min.css';
+@import '../node_modules/medium-editor/dist/css/themes/beagle.min.css';
 </style>

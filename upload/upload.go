@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -502,12 +503,41 @@ func (s Story) Print() {
 	fmt.Printf("%13s: %.80s...\n", "Body text", s.BodyText())
 }
 
+// func (s *Story) MarshalJSON ([]byte, error) {
+//     storyJSON := bytes.NewBufferString("{")
+// }
+
 func NewStory() Story {
 	return Story{
 		IDMLStories: []IDMLStory{},
 		IDMLLinks:   []IDMLLink{},
 		cache:       make(map[string]interface{}),
 	}
+}
+
+func NewStoryFromFile(f io.Reader) Story {
+	story := NewStory()
+	decoder := xml.NewDecoder(f)
+	for {
+		t, _ := decoder.Token()
+		if t == nil {
+			break
+		}
+		switch se := t.(type) {
+		case xml.StartElement:
+			switch se.Name.Local {
+			case "Story":
+				idmlStory := IDMLStory{}
+				decoder.DecodeElement(&idmlStory, &se)
+				story.IDMLStories = append(story.IDMLStories, idmlStory)
+			case "Link":
+				idmlLink := IDMLLink{}
+				decoder.DecodeElement(&idmlLink, &se)
+				story.IDMLLinks = append(story.IDMLLinks, idmlLink)
+			}
+		}
+	}
+	return story
 }
 
 func ParseAndUpload(apiPassword, snippetPath string) {
