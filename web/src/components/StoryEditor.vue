@@ -1,18 +1,24 @@
 <template>
   <div>
     <section class="section">
-      <div class="columns">
-        <div class="column is-6">
+      <div class="columns is-mobile">
+        <div class="column">
           <h1 class="title">Story editor</h1>
           <h2 class="subtitle">Turn a story into a WordPress post.</h2>
         </div>
-        <div class="column is-6">
-          <div class="field is-grouped is-pulled-right">
+        <div class="column">
+          <div class="field is-grouped is-grouped-right is-grouped-multiline">
             <p class="control">
-              <a class="button is-primary" v-on:click="validate">Validate</a>
+              <a class="button is-primary" v-on:click="validate">
+                <span class="icon"><font-awesome-icon :icon="syncIcon" /></span>
+                <span> </span>Validate
+              </a>
             </p>
             <p class="control">
-              <a class="button is-primary is-pulled-right" v-bind:disabled="!canCreatePost">Create post</a>
+              <a class="button is-primary" v-bind:disabled="!canCreatePost">
+                <span class="icon"><font-awesome-icon :icon="uploadIcon" /></span>
+                <span> </span>Create post
+              </a>
             </p>
           </div>
         </div>
@@ -28,7 +34,7 @@
         </div>
       </div>
       <hr>
-      <medium-editor class="has-text-danger is-uppercase" :text="story.kicker" :options="editorOptions" v-on:edit="editKicker" />
+      <medium-editor class="has-text-danger is-uppercase has-text-weight-semibold" :text="story.kicker" :options="editorOptions" v-on:edit="editKicker" />
       <medium-editor class="title" :text="story.headline" :options="editorOptions" v-on:edit="editHeadline" />
       <medium-editor class="subtitle" :text="story.subdeck" :options="editorOptions" v-on:edit="editSubdeck" />
       <medium-editor class="author-name has-text-weight-semibold" :text="story.authorName" :options="editorOptions" v-on:edit="editAuthorName" />
@@ -40,6 +46,9 @@
 
 <script>
 import editor from 'vue2-medium-editor'
+import FontAwesomeIcon from '@fortawesome/vue-fontawesome'
+import { faCheck, faCloudUploadAlt } from '@fortawesome/fontawesome-free-solid'
+
 export default {
   name: 'StoryEditor',
   data () {
@@ -118,13 +127,20 @@ export default {
     'story'
   ],
   components: {
-    'medium-editor': editor
+    'medium-editor': editor,
+    FontAwesomeIcon
   },
   computed: {
     canCreatePost () {
       if (!this.didValidation) return false
       if (this.validationErrors.length === 0) return true
       return false
+    },
+    syncIcon () {
+      return faCheck
+    },
+    uploadIcon () {
+      return faCloudUploadAlt
     }
   }
 }
