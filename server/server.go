@@ -9,7 +9,6 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/thepoly/uploader/story"
-	"github.com/thepoly/uploader/upload"
 )
 
 type Server struct {
@@ -36,7 +35,7 @@ func New(apiPassword string) (*Server, error) {
 		AllowedOrigins: []string{"*"},
 	})
 	router.Use(cors.Handler)
-	router.Post("/validate-snippet", server.ValidateSnippetHandler)
+	router.Post("/validate-story", server.ValidateStoryHandler)
 	router.Get("/available-stories", server.GetAvailableStories)
 	server.handler = router
 
@@ -48,17 +47,17 @@ func (s *Server) Run() {
 	http.ListenAndServe(s.listenAddr, s.handler)
 }
 
-func (s *Server) ValidateSnippetHandler(w http.ResponseWriter, req *http.Request) {
-	log.Println("new snippet!")
-	story := upload.NewStoryFromFile(req.Body)
-	w.Header().Set("Content-Type", "application/json")
-	encoder := json.NewEncoder(w)
-	err := encoder.Encode(&story)
-	if err != nil {
-		http.Error(w, "Unable to marshal story", 500)
-		return
-	}
-}
+// func (s *Server) ValidateSnippetHandler(w http.ResponseWriter, req *http.Request) {
+// 	log.Println("new snippet!")
+// 	story := upload.NewStoryFromFile(req.Body)
+// 	w.Header().Set("Content-Type", "application/json")
+// 	encoder := json.NewEncoder(w)
+// 	err := encoder.Encode(&story)
+// 	if err != nil {
+// 		http.Error(w, "Unable to marshal story", 500)
+// 		return
+// 	}
+// }
 
 func (s *Server) GetAvailableStories(w http.ResponseWriter, req *http.Request) {
 	stories := s.storyManager.GetStories()
@@ -71,6 +70,20 @@ func (s *Server) GetAvailableStories(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// func (s *Server) ValidateStoryHandler(w http.ResponseWriter, req *http.Request) {
-//
-// }
+func (s *Server) ValidateStoryHandler(w http.ResponseWriter, req *http.Request) {
+	story := &story.Story{}
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(story)
+	if err != nil {
+		http.Error(w, "Unable to decode story", 500)
+		return
+	}
+	validationErrors := story.ValidationErrors()
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	err = encoder.Encode(&validationErrors)
+	if err != nil {
+		http.Error(w, "Unable to encode validation errors", 500)
+		return
+	}
+}

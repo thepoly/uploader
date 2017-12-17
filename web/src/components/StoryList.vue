@@ -38,7 +38,7 @@
 import FontAwesomeIcon from '@fortawesome/vue-fontawesome'
 import { faFile } from '@fortawesome/fontawesome-free-solid'
 export default {
-  name: 'PostEditor',
+  name: 'StoryEditor',
   data () {
     return {
       posts: []
@@ -54,7 +54,7 @@ export default {
   methods: {
     editStory (story) {
       this.$router.push({
-        name: 'PostEditor',
+        name: 'StoryEditor',
         params: {
           story: story
         }

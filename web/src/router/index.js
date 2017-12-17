@@ -1,7 +1,7 @@
 import Vue from 'vue'
 import Router from 'vue-router'
-import PostEditor from '@/components/PostEditor'
-import PostList from '@/components/PostList'
+import StoryEditor from '@/components/StoryEditor'
+import StoryList from '@/components/StoryList'
 
 Vue.use(Router)
 
@@ -10,13 +10,13 @@ export default new Router({
   routes: [
     {
       path: '/',
-      name: 'PostList',
-      component: PostList
+      name: 'StoryList',
+      component: StoryList
     },
     {
       path: '/editor',
-      name: 'PostEditor',
-      component: PostEditor,
+      name: 'StoryEditor',
+      component: StoryEditor,
       props: true
     }
   ]
